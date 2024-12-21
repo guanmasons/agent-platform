@@ -146,11 +146,16 @@ Resources:
           curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           chmod +x /usr/local/bin/docker-compose
 
-          # Create project directory
-          mkdir -p /opt/agent-platform
-
-          # Clone repository
+          # Clean up and clone repository
+          rm -rf /opt/agent-platform
           git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
+
+          # Verify successful clone
+          if [ ! -d "/opt/agent-platform/.git" ]; then
+            echo "Git repository not properly cloned. Exiting."
+            exit 1
+          fi
+
           cd /opt/agent-platform
 
           # Create and populate .env file
