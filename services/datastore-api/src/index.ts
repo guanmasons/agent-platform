@@ -72,21 +72,6 @@ app.delete("/users/:userId", async (req: Request, res: Response) => {
   }
 });
 
-app.get("/users/email/:email", async (req: Request, res: Response) => {
-  const email = req.params.email;
-  try {
-    const user = await userModel.getUserByEmail(email);
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).send("User not found");
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Internal Server Error");
-  }
-});
-
 // Agent API Routes
 app.get("/agents/:agentId", async (req: Request, res: Response) => {
   const agentId = req.params.agentId;
@@ -140,15 +125,15 @@ app.delete("/agents/:agentId", async (req: Request, res: Response) => {
 });
 
 app.get('/users/:userId/agents', async (req: Request, res: Response) => {
-    const userId = req.params.userId;
-    try {
-      const agents = await agentModel.getAgentsByUserId(userId);
-      res.json(agents);
-    } catch (error) {
-      console.error(error);
-      res.status(500).send('Internal Server Error');
-    }
-  });
+  const userId = req.params.userId;
+  try {
+    const agents = await agentModel.getAgentsByUserId(userId);
+    res.json(agents);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 app.listen(SERVICE_PORT, () => {
   console.log(`Datastore API listening on port ${SERVICE_PORT}`);

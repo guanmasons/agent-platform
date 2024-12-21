@@ -4,7 +4,7 @@ import {
   PutItemCommand,
   UpdateItemCommand,
   DeleteItemCommand,
-  ScanCommand,
+  QueryCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { Agent } from "../types/agent";
@@ -56,9 +56,10 @@ export class AgentModel {
       TableName: this.tableName,
       Key: marshall({ agentId: agent.agentId }),
       UpdateExpression:
-        "set agentName = :agentName, description = :description, scope = :scope, oosAction = :oosAction, updatedAt = :updatedAt, url = :url, mstpAddr = :mstpAddr",
+        "set agentName = :agentName, userId = :userId, description = :description, scope = :scope, oosAction = :oosAction, updatedAt = :updatedAt, url = :url, mstpAddr = :mstpAddr",
       ExpressionAttributeValues: marshall({
         ":agentName": agent.agentName,
+        ":userId": agent.userId,
         ":description": agent.description,
         ":scope": agent.scope,
         ":oosAction": agent.oosAction,
@@ -87,14 +88,14 @@ export class AgentModel {
   async getAgentsByUserId(userId: string): Promise<Agent[]> {
     const params = {
       TableName: this.tableName,
-      IndexName: "UserAgentIndex", // Assuming you have a GSI named UserAgentIndex
+      IndexName: "UserAgentIndex",
       KeyConditionExpression: "userId = :userId",
       ExpressionAttributeValues: marshall({
         ":userId": userId,
       }),
     };
   
-    const { Items } = await this.dynamodbClient.send(new ScanCommand(params));
+    const { Items } = await this.dynamodbClient.send(new QueryCommand(params));
     return Items ? (Items.map((item) => unmarshall(item) as Agent)) : [];
   }
 }

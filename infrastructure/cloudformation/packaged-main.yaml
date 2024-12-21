@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Main template for Agent Platform
-
 Parameters:
   AWSRegion:
     Type: String
@@ -17,33 +16,49 @@ Parameters:
   KeycloakAdminPassword:
     Type: String
     Default: ''
-
 Resources:
   DynamoDBTables:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-dynamodb.yaml'
+      TemplateURL:
+        Fn::Sub: https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-dynamodb.yaml
       TimeoutInMinutes: 5
-
   EC2Instance:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-ec2.yaml'
+      TemplateURL:
+        Fn::Sub: https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-ec2.yaml
       Parameters:
-        DynamoDBTableArn: !GetAtt DynamoDBTables.Outputs.DynamoDBTableArn
-        KeycloakClientSecret: !Ref KeycloakClientSecret
-        KeycloakAdminPassword: !Ref KeycloakAdminPassword
-
+        DynamoDBTableArn:
+          Fn::GetAtt:
+          - DynamoDBTables
+          - Outputs.DynamoDBTableArn
+        KeycloakClientSecret:
+          Ref: KeycloakClientSecret
+        KeycloakAdminPassword:
+          Ref: KeycloakAdminPassword
 Outputs:
   EC2InstanceId:
     Description: The ID of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstanceId
+    Value:
+      Fn::GetAtt:
+      - EC2Instance
+      - Outputs.EC2InstanceId
   DynamoDBTableName:
     Description: The name of the DynamoDB table
-    Value: !GetAtt DynamoDBTables.Outputs.DynamoDBTableName
+    Value:
+      Fn::GetAtt:
+      - DynamoDBTables
+      - Outputs.DynamoDBTableName
   EC2InstancePublicDNS:
     Description: Public DNS of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstancePublicDNS
+    Value:
+      Fn::GetAtt:
+      - EC2Instance
+      - Outputs.EC2InstancePublicDNS
   EC2InstancePublicIP:
     Description: Public IP of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstancePublicIP
+    Value:
+      Fn::GetAtt:
+      - EC2Instance
+      - Outputs.EC2InstancePublicIP

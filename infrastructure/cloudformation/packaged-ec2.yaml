@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 instance for AI Agent Platform
+Parameters:
+  DynamoDBTableArn:
+    Type: String
+  KeycloakClientSecret:
+    Type: String
+    NoEcho: true
+  KeycloakAdminPassword:
+    Type: String
+    NoEcho: true
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: EC2AmiId
+      InstanceType:
+        Ref: EC2InstanceType
+      KeyName:
+        Ref: EC2KeyPairName
+      SecurityGroupIds:
+      - Ref: EC2SecurityGroup
+      IamInstanceProfile:
+        Ref: EC2InstanceProfile
+      UserData:
+        Fn::Base64:
+          Fn::Sub: '#!/bin/bash
+
+            yum update -y
+
+            yum install -y docker git
+
+            systemctl start docker
+
+            systemctl enable docker
+
+            usermod -a -G docker ec2-user
+
+            curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname
+            -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+            chmod +x /usr/local/bin/docker-compose
+
+            # Install AWS CLI v2
+
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+            unzip awscliv2.zip
+
+            ./aws/install
+
+
+            # Set environment variables
+
+            echo "KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}" >> /opt/ai-agent-platform/.env
+
+            echo "KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}" >> /opt/ai-agent-platform/.env
+
+
+            # Clone the GitHub repository
+
+            git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/ai-agent-platform
+
+            chown -R ec2-user:ec2-user /opt/ai-agent-platform
+
+
+            # Build and start services using Docker Compose
+
+            cd /opt/ai-agent-platform
+
+            docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d
+            --build
+
+            '
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Fn::Sub: ${AWS::StackName}-ai-agent-platform-sg
+      GroupDescription: Allow SSH, HTTP, and HTTPS
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort:
+          Ref: KeycloakPort
+        ToPort:
+          Ref: KeycloakPort
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort:
+          Ref: WebServicePort
+        ToPort:
+          Ref: WebServicePort
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort:
+          Ref: DatastoreApiPort
+        ToPort:
+          Ref: DatastoreApiPort
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort:
+          Ref: ControlApiPort
+        ToPort:
+          Ref: ControlApiPort
+        CidrIp: 0.0.0.0/0
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName:
+        Fn::Sub: ${AWS::StackName}-EC2InstanceProfile
+      Path: /
+      Roles:
+      - Ref: EC2InstanceRole
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: ${AWS::StackName}-EC2InstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: EC2DynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:*
+            Resource:
+              Ref: DynamoDBTableArn
+  EC2AmiId:
+    Type: String
+    Default: ami-0c55b31ad2299a701
+  EC2InstanceType:
+    Type: String
+    Default: t2.micro
+  EC2KeyPairName:
+    Type: String
+    Default: ai-agent-key-pair
+  DatastoreApiPort:
+    Type: Number
+    Default: 3001
+  ControlApiPort:
+    Type: Number
+    Default: 3002
+  WebServicePort:
+    Type: Number
+    Default: 3000
+  KeycloakPort:
+    Type: Number
+    Default: 8080
+  GitHubUsername:
+    Type: String
+    Default: your-github-username
+  GitHubRepo:
+    Type: String
+    Default: ai-agent-platform
+Outputs:
+  EC2InstanceId:
+    Description: The ID of the EC2 instance
+    Value:
+      Ref: EC2Instance
+  EC2InstancePublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value:
+      Fn::GetAtt:
+      - EC2Instance
+      - PublicDnsName
+  EC2InstancePublicIP:
+    Description: Public IP of the EC2 instance
+    Value:
+      Fn::GetAtt:
+      - EC2Instance
+      - PublicIp

@@ -13,7 +13,7 @@ services:
       - DYNAMODB_AGENT_TABLE=${DYNAMODB_AGENT_TABLE}
       - DYNAMODB_USER_LOGIN_TABLE=${DYNAMODB_USER_LOGIN_TABLE}
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   control-api:
     build:
@@ -34,7 +34,7 @@ services:
       - datastore-api
       - keycloak
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   search-api:
     build:
@@ -43,7 +43,7 @@ services:
     ports:
       - "${SEARCH_API_PORT}:${SEARCH_API_PORT}"
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   web-service:
     build:
@@ -59,21 +59,21 @@ services:
     depends_on:
       - control-api
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   developer-api:
     build:
       context: ../../services/developer-api
       dockerfile: Dockerfile
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   crawler-api:
     build:
       context: ../../services/crawler-api
       dockerfile: Dockerfile
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
   keycloak:
     build:
@@ -85,8 +85,8 @@ services:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     networks:
-      - ai-agent-network
+      - agent-platform-network
 
 networks:
-  ai-agent-network:
+  agent-platform-network:
     driver: bridge
