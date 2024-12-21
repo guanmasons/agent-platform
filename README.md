@@ -48,3 +48,5 @@ On your local, run:
 ./load_env.sh
 ./deploy.sh
 ```
+3. Verify service is up and running
+- On your local terminal, run `ssh -i /path/to/agent-platform-key-pair.pem ec2-user@<your-ec2-public-ip>`

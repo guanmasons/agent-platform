@@ -125,48 +125,75 @@ Resources:
       IamInstanceProfile: !Ref EC2InstanceProfile
       UserData:
         Fn::Base64: !Sub |
-          #!/bin/bash
+          #!/bin/bash -xe
+          
+          # Install required packages
           yum update -y
-          yum install -y docker git
+          yum install -y docker git unzip
+
+          # Start and enable Docker
           systemctl start docker
           systemctl enable docker
           usermod -a -G docker ec2-user
+
+          # Install AWS CLI v2
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+          rm awscliv2.zip
 
           # Install Docker Compose
           curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           chmod +x /usr/local/bin/docker-compose
 
-          # Create project directory and .env file
+          # Create project directory
           mkdir -p /opt/agent-platform
-          touch /opt/agent-platform/.env
 
-          # Set environment variables
+          # Clone repository
+          git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
+          cd /opt/agent-platform
+
+          # Create and populate .env file
           cat << EOF > /opt/agent-platform/.env
           AWS_REGION=${AWS::Region}
+          AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
+          AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
+          
+          # DynamoDB Tables
+          DYNAMODB_USER_TABLE=${UserTable}
+          DYNAMODB_AGENT_TABLE=${AgentTable}
+          DYNAMODB_USER_LOGIN_TABLE=${LoginTable}
+          
+          # Service Ports
           DATASTORE_API_PORT=${DatastoreApiPort}
           CONTROL_API_PORT=${ControlApiPort}
           SEARCH_API_PORT=${SearchApiPort}
           WEB_SERVICE_PORT=${WebServicePort}
+          
+          # Keycloak Configuration
           KEYCLOAK_REALM=${KeycloakRealm}
           KEYCLOAK_CLIENT_ID=${KeycloakClientId}
           KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}
           KEYCLOAK_ADMIN_USER=${KeycloakAdminUser}
           KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
           KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
-          DYNAMODB_USER_TABLE=${UserTable}
-          DYNAMODB_AGENT_TABLE=${AgentTable}
-          DYNAMODB_USER_LOGIN_TABLE=${LoginTable}
-          AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
-          AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
+          
+          # Get the instance's public IP
+          EC2_PUBLIC_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
+          
+          # Docker Compose Project Name
+          COMPOSE_PROJECT_NAME=agent-platform
           EOF
 
-          # Clone repository
-          git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
+          # Set proper permissions
           chown -R ec2-user:ec2-user /opt/agent-platform
 
-          # Start services
+          # Start Docker services
           cd /opt/agent-platform
           docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+
+          # Add log to track execution
+          echo "UserData script completed at $(date)" >> /var/log/user-data.log
 
 Parameters:
   EC2InstanceType:
