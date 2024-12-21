@@ -1,49 +1,236 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Main template for Agent Platform
-
-Parameters:
-  AWSRegion:
-    Type: String
-    Default: us-west-1
-  DynamoDBTableArn:
-    Type: String
-    Default: ''
-  S3BucketName:
-    Type: String
-    Default: ''
-  KeycloakClientSecret:
-    Type: String
-    Default: ''
-  KeycloakAdminPassword:
-    Type: String
-    Default: ''
+Description: Agent Platform Infrastructure
 
 Resources:
-  DynamoDBTables:
-    Type: AWS::CloudFormation::Stack
+  # DynamoDB Tables
+  UserTable:
+    Type: AWS::DynamoDB::Table
     Properties:
-      TemplateURL: !Sub 'https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-dynamodb.yaml'
-      TimeoutInMinutes: 5
+      TableName: !Sub '${AWS::StackName}-UserTable'
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  AgentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-AgentTable'
+      AttributeDefinitions:
+        - AttributeName: agentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: agentId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  LoginTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-LoginTable'
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  # EC2 Instance and Related Resources
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Agent Platform
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3002
+          ToPort: 3002
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3003
+          ToPort: 3003
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - !GetAtt UserTable.Arn
+                  - !GetAtt AgentTable.Arn
+                  - !GetAtt LoginTable.Arn
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2InstanceRole
 
   EC2Instance:
-    Type: AWS::CloudFormation::Stack
+    Type: AWS::EC2::Instance
     Properties:
-      TemplateURL: !Sub 'https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-ec2.yaml'
-      Parameters:
-        DynamoDBTableArn: !GetAtt DynamoDBTables.Outputs.DynamoDBTableArn
-        KeycloakClientSecret: !Ref KeycloakClientSecret
-        KeycloakAdminPassword: !Ref KeycloakAdminPassword
+      ImageId: ami-0aa117785d1c1bfe5
+      InstanceType: !Ref EC2InstanceType
+      KeyName: !Ref EC2KeyPairName
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y docker git
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+
+          # Install Docker Compose
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+
+          # Create project directory and .env file
+          mkdir -p /opt/agent-platform
+          touch /opt/agent-platform/.env
+
+          # Set environment variables
+          cat << EOF > /opt/agent-platform/.env
+          AWS_REGION=${AWS::Region}
+          DATASTORE_API_PORT=${DatastoreApiPort}
+          CONTROL_API_PORT=${ControlApiPort}
+          SEARCH_API_PORT=${SearchApiPort}
+          WEB_SERVICE_PORT=${WebServicePort}
+          KEYCLOAK_REALM=${KeycloakRealm}
+          KEYCLOAK_CLIENT_ID=${KeycloakClientId}
+          KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}
+          KEYCLOAK_ADMIN_USER=${KeycloakAdminUser}
+          KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
+          KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
+          DYNAMODB_USER_TABLE=${UserTable}
+          DYNAMODB_AGENT_TABLE=${AgentTable}
+          DYNAMODB_USER_LOGIN_TABLE=${LoginTable}
+          AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
+          AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
+          EOF
+
+          # Clone repository
+          git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
+          chown -R ec2-user:ec2-user /opt/agent-platform
+
+          # Start services
+          cd /opt/agent-platform
+          docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+
+Parameters:
+  EC2InstanceType:
+    Type: String
+    Default: t2.micro
+  EC2KeyPairName:
+    Type: String
+    Default: agent-platform-key-pair
+  KeycloakRealm:
+    Type: String
+    Default: agent-platform-realm
+  KeycloakClientId:
+    Type: String
+    Default: agent-platform-client
+  KeycloakClientSecret:
+    Type: String
+    NoEcho: true
+  KeycloakAdminUser:
+    Type: String
+    Default: admin
+  KeycloakAdminPassword:
+    Type: String
+    NoEcho: true
+  KeycloakWebClientId:
+    Type: String
+    Default: agent-platform-web-client
+  DatastoreApiPort:
+    Type: String
+    Default: "3001"
+  ControlApiPort:
+    Type: String
+    Default: "3002"
+  SearchApiPort:
+    Type: String
+    Default: "3003"
+  WebServicePort:
+    Type: String
+    Default: "3000"
+  GitHubUsername:
+    Type: String
+    Default: guanmasons
+  GitHubRepo:
+    Type: String
+    Default: agent-platform
+  AwsAccessKeyId:
+    Type: String
+    NoEcho: true
+  AwsSecretAccessKey:
+    Type: String
+    NoEcho: true
 
 Outputs:
-  EC2InstanceId:
-    Description: The ID of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstanceId
-  DynamoDBTableName:
-    Description: The name of the DynamoDB table
-    Value: !GetAtt DynamoDBTables.Outputs.DynamoDBTableName
-  EC2InstancePublicDNS:
-    Description: Public DNS of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstancePublicDNS
   EC2InstancePublicIP:
     Description: Public IP of the EC2 instance
-    Value: !GetAtt EC2Instance.Outputs.EC2InstancePublicIP
+    Value: !GetAtt EC2Instance.PublicIp
+  EC2InstancePublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value: !GetAtt EC2Instance.PublicDnsName
+  UserTableName:
+    Description: Name of the User DynamoDB table
+    Value: !Ref UserTable
+  AgentTableName:
+    Description: Name of the Agent DynamoDB table
+    Value: !Ref AgentTable
+  LoginTableName:
+    Description: Name of the Login DynamoDB table
+    Value: !Ref LoginTable

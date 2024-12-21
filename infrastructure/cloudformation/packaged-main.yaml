@@ -4,39 +4,50 @@ Parameters:
   AWSRegion:
     Type: String
     Default: us-west-1
-  DynamoDBTableArn:
-    Type: String
-    Default: ''
-  S3BucketName:
-    Type: String
-    Default: ''
   KeycloakClientSecret:
     Type: String
     Default: ''
   KeycloakAdminPassword:
     Type: String
     Default: ''
+  GitHubUsername:
+    Type: String
+    Default: guanmasons
+  GitHubRepo:
+    Type: String
+    Default: agent-platform
 Resources:
   DynamoDBTables:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL:
-        Fn::Sub: https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-dynamodb.yaml
-      TimeoutInMinutes: 5
+      TemplateURL: https://s3.amazonaws.com/cfn-art/c50a312224932f0fa0432c50ac03c596.template
+      TimeoutInMinutes: 10
   EC2Instance:
     Type: AWS::CloudFormation::Stack
+    DependsOn: DynamoDBTables
     Properties:
-      TemplateURL:
-        Fn::Sub: https://${S3BucketName}.s3.${AWSRegion}.amazonaws.com/packaged-ec2.yaml
+      TemplateURL: https://s3.amazonaws.com/cfn-art/2f66679d0a4491973843e82e6d9dfb8e.template
       Parameters:
-        DynamoDBTableArn:
-          Fn::GetAtt:
-          - DynamoDBTables
-          - Outputs.DynamoDBTableArn
+        DynamoDBTableArns:
+          Fn::Join:
+          - ','
+          - - Fn::GetAtt:
+              - DynamoDBTables
+              - Outputs.DynamoDBTableArn
+            - Fn::GetAtt:
+              - DynamoDBTables
+              - Outputs.AgentDynamoDBTableArn
+            - Fn::GetAtt:
+              - DynamoDBTables
+              - Outputs.LoginDynamoDBTableArn
         KeycloakClientSecret:
           Ref: KeycloakClientSecret
         KeycloakAdminPassword:
           Ref: KeycloakAdminPassword
+        GitHubUsername:
+          Ref: GitHubUsername
+        GitHubRepo:
+          Ref: GitHubRepo
 Outputs:
   EC2InstanceId:
     Description: The ID of the EC2 instance

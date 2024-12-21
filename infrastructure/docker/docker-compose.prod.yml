@@ -5,13 +5,16 @@ services:
       context: ../../services/datastore-api
       dockerfile: Dockerfile
     ports:
-      - "${DATASTORE_API_PORT}:${DATASTORE_API_PORT}"
+      - "${DATASTORE_API_PORT:-3001}:${DATASTORE_API_PORT:-3001}"
     environment:
-      - SERVICE_PORT=${DATASTORE_API_PORT}
+      - SERVICE_PORT=${DATASTORE_API_PORT:-3001}
       - SERVICE_REGION=${AWS_REGION}
-      - DYNAMODB_USER_TABLE=${DYNAMODB_USER_TABLE}
-      - DYNAMODB_AGENT_TABLE=${DYNAMODB_AGENT_TABLE}
-      - DYNAMODB_USER_LOGIN_TABLE=${DYNAMODB_USER_LOGIN_TABLE}
+      - DYNAMODB_USER_TABLE=${AWS::StackName}-UserTable
+      - DYNAMODB_AGENT_TABLE=${AWS::StackName}-AgentTable
+      - DYNAMODB_USER_LOGIN_TABLE=${AWS::StackName}-LoginTable
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
     networks:
       - agent-platform-network
 
@@ -20,28 +23,19 @@ services:
       context: ../../services/control-api
       dockerfile: Dockerfile
     ports:
-      - "${CONTROL_API_PORT}:${CONTROL_API_PORT}"
+      - "${CONTROL_API_PORT:-3002}:${CONTROL_API_PORT:-3002}"
     environment:
-      - SERVICE_PORT=${CONTROL_API_PORT}
+      - SERVICE_PORT=${CONTROL_API_PORT:-3002}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
       - KEYCLOAK_ADMIN_USER=${KEYCLOAK_ADMIN_USER}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KEYCLOAK_SERVER_URL=http://keycloak:8080
-      - DATASTORE_API_URL=http://datastore-api:${DATASTORE_API_PORT}
+      - DATASTORE_API_URL=http://datastore-api:${DATASTORE_API_PORT:-3001}
     depends_on:
       - datastore-api
       - keycloak
-    networks:
-      - agent-platform-network
-
-  search-api:
-    build:
-      context: ../../services/search-api
-      dockerfile: Dockerfile
-    ports:
-      - "${SEARCH_API_PORT}:${SEARCH_API_PORT}"
     networks:
       - agent-platform-network
 
@@ -50,28 +44,14 @@ services:
       context: ../../services/web-service
       dockerfile: Dockerfile
     ports:
-      - "${WEB_SERVICE_PORT}:${WEB_SERVICE_PORT}"
+      - "${WEB_SERVICE_PORT:-3000}:${WEB_SERVICE_PORT:-3000}"
     environment:
-      - REACT_APP_CONTROL_API_URL=http://<your-ec2-public-ip>:${CONTROL_API_PORT} # Update on first run
-      - REACT_APP_KEYCLOAK_URL=http://<your-ec2-public-ip>:8080 # Update on first run
+      - REACT_APP_CONTROL_API_URL=${EC2_PUBLIC_IP:-localhost}:${CONTROL_API_PORT:-3002}
+      - REACT_APP_KEYCLOAK_URL=${EC2_PUBLIC_IP:-localhost}:8080
       - REACT_APP_KEYCLOAK_REALM=${KEYCLOAK_REALM}
       - REACT_APP_KEYCLOAK_CLIENT_ID=${KEYCLOAK_WEB_CLIENT_ID}
     depends_on:
       - control-api
-    networks:
-      - agent-platform-network
-
-  developer-api:
-    build:
-      context: ../../services/developer-api
-      dockerfile: Dockerfile
-    networks:
-      - agent-platform-network
-
-  crawler-api:
-    build:
-      context: ../../services/crawler-api
-      dockerfile: Dockerfile
     networks:
       - agent-platform-network
 

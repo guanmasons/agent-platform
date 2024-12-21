@@ -21,3 +21,6 @@ build/
 .idea/
 *.iml
 *.vscode/
+
+# Packaged
+infrastructure/cloudformation/packaged*
