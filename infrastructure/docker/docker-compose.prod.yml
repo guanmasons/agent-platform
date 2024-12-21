@@ -1,0 +1,92 @@
+version: '3.8'
+services:
+  datastore-api:
+    build:
+      context: ../../services/datastore-api
+      dockerfile: Dockerfile
+    ports:
+      - "${DATASTORE_API_PORT}:${DATASTORE_API_PORT}"
+    environment:
+      - SERVICE_PORT=${DATASTORE_API_PORT}
+      - SERVICE_REGION=${AWS_REGION}
+      - DYNAMODB_USER_TABLE=${DYNAMODB_USER_TABLE}
+      - DYNAMODB_AGENT_TABLE=${DYNAMODB_AGENT_TABLE}
+      - DYNAMODB_USER_LOGIN_TABLE=${DYNAMODB_USER_LOGIN_TABLE}
+    networks:
+      - ai-agent-network
+
+  control-api:
+    build:
+      context: ../../services/control-api
+      dockerfile: Dockerfile
+    ports:
+      - "${CONTROL_API_PORT}:${CONTROL_API_PORT}"
+    environment:
+      - SERVICE_PORT=${CONTROL_API_PORT}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_ADMIN_USER=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - DATASTORE_API_URL=http://datastore-api:${DATASTORE_API_PORT}
+    depends_on:
+      - datastore-api
+      - keycloak
+    networks:
+      - ai-agent-network
+
+  search-api:
+    build:
+      context: ../../services/search-api
+      dockerfile: Dockerfile
+    ports:
+      - "${SEARCH_API_PORT}:${SEARCH_API_PORT}"
+    networks:
+      - ai-agent-network
+
+  web-service:
+    build:
+      context: ../../services/web-service
+      dockerfile: Dockerfile
+    ports:
+      - "${WEB_SERVICE_PORT}:${WEB_SERVICE_PORT}"
+    environment:
+      - REACT_APP_CONTROL_API_URL=http://<your-ec2-public-ip>:${CONTROL_API_PORT} # Update on first run
+      - REACT_APP_KEYCLOAK_URL=http://<your-ec2-public-ip>:8080 # Update on first run
+      - REACT_APP_KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - REACT_APP_KEYCLOAK_CLIENT_ID=${KEYCLOAK_WEB_CLIENT_ID}
+    depends_on:
+      - control-api
+    networks:
+      - ai-agent-network
+
+  developer-api:
+    build:
+      context: ../../services/developer-api
+      dockerfile: Dockerfile
+    networks:
+      - ai-agent-network
+
+  crawler-api:
+    build:
+      context: ../../services/crawler-api
+      dockerfile: Dockerfile
+    networks:
+      - ai-agent-network
+
+  keycloak:
+    build:
+      context: ../../services/keycloak
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    networks:
+      - ai-agent-network
+
+networks:
+  ai-agent-network:
+    driver: bridge
