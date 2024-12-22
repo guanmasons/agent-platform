@@ -52,14 +52,17 @@ services:
     build:
       context: ../../services/web-service
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://localhost:3002
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
       - control-api
     networks:
       - internal
       - external
+    environment:
+      - NODE_ENV=production
 
 networks:
   internal:

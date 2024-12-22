@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { getAgentsByUserId, createAgent, updateAgent, deleteAgent } from '../services/api';
 import keycloak from '../auth/keycloak';
 import { Agent } from '../types/agent';
 
 const Agents: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [newAgent, setNewAgent] = useState<Agent>({
     id: '',
     name: '',
@@ -16,9 +17,8 @@ const Agents: React.FC = () => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     url: '',
-    mstpAddr: '',
+    mstpAddr: ''
   });
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -27,28 +27,40 @@ const Agents: React.FC = () => {
           console.error('Access token is not available.');
           return;
         }
-        const fetchedAgents = await getAgentsByUserId(keycloak.token);
-        setAgents(fetchedAgents);
+        const agentData = await getAgentsByUserId(keycloak.token);
+        setAgents(agentData);
       } catch (error) {
-        console.error('Failed to fetch agents:', error);
+        console.error('Error fetching agents:', error);
       }
     };
 
     fetchAgents();
   }, []);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = event.target;
     if (editingAgent) {
-      setEditingAgent({ ...editingAgent, [name]: value });
+      setEditingAgent({
+        ...editingAgent,
+        [name]: value,
+      });
     } else {
-      setNewAgent({ ...newAgent, [name]: value });
+      setNewAgent({
+        ...newAgent,
+        [name]: value,
+      });
     }
   };
 
   const handleCreateAgent = async () => {
     try {
-      const createdAgent = await createAgent(newAgent, keycloak.token!);
+      if (!keycloak.token) {
+        console.error('Access token is not available.');
+        return;
+      }
+      const createdAgent = await createAgent(newAgent, keycloak.token);
       setAgents([...agents, createdAgent]);
       setNewAgent({
         id: '',
@@ -61,10 +73,39 @@ const Agents: React.FC = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         url: '',
-        mstpAddr: '',
+        mstpAddr: ''
       });
     } catch (error) {
-      console.error('Failed to create agent:', error);
+      console.error('Error creating agent:', error);
+    }
+  };
+
+  const handleUpdateAgent = async () => {
+    try {
+      if (!editingAgent || !keycloak.token) {
+        console.error('No agent selected for update or token not available.');
+        return;
+      }
+      const updatedAgent = await updateAgent(editingAgent, keycloak.token);
+      setAgents(agents.map(agent => 
+        agent.id === updatedAgent.id ? updatedAgent : agent
+      ));
+      setEditingAgent(null);
+    } catch (error) {
+      console.error('Error updating agent:', error);
+    }
+  };
+
+  const handleDeleteAgent = async (id: string) => {
+    try {
+      if (!keycloak.token) {
+        console.error('Access token is not available.');
+        return;
+      }
+      await deleteAgent(id, keycloak.token);
+      setAgents(agents.filter(agent => agent.id !== id));
+    } catch (error) {
+      console.error('Error deleting agent:', error);
     }
   };
 
@@ -72,31 +113,9 @@ const Agents: React.FC = () => {
     setEditingAgent(agent);
   };
 
-  const handleUpdateAgent = async () => {
-    if (!editingAgent) return;
-    try {
-      const updatedAgent = await updateAgent(editingAgent, keycloak.token!);
-      setAgents(agents.map((a) => (a.id === updatedAgent.id ? updatedAgent : a)));
-      setEditingAgent(null);
-    } catch (error) {
-      console.error('Failed to update agent:', error);
-    }
-  };
-
-  const handleDeleteAgent = async (agentId: string) => {
-    try {
-      await deleteAgent(agentId, keycloak.token!);
-      setAgents(agents.filter((a) => a.id !== agentId));
-    } catch (error) {
-      console.error('Failed to delete agent:', error);
-    }
-  };
-
   return (
     <div>
       <h1>Agents</h1>
-
-      {/* Create Agent Form */}
       <div>
         <h2>{editingAgent ? 'Edit Agent' : 'Create New Agent'}</h2>
         <input
@@ -104,41 +123,6 @@ const Agents: React.FC = () => {
           name="name"
           placeholder="Agent Name"
           value={editingAgent ? editingAgent.name : newAgent.name}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          name="description"
-          placeholder="Description"
-          value={editingAgent ? editingAgent.description : newAgent.description}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          name="scope"
-          placeholder="Scope"
-          value={editingAgent ? editingAgent.scope : newAgent.scope}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          name="oosAction"
-          placeholder="Out of Scope Action"
-          value={editingAgent ? editingAgent.oosAction : newAgent.oosAction}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          name="url"
-          placeholder="URL"
-          value={editingAgent ? editingAgent.url : newAgent.url}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          name="mstpAddr"
-          placeholder="MSTP Address"
-          value={editingAgent ? editingAgent.mstpAddr : newAgent.mstpAddr}
           onChange={handleInputChange}
         />
         <select
@@ -149,7 +133,6 @@ const Agents: React.FC = () => {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
-        {/* Add more input fields for other properties as needed */}
         {editingAgent ? (
           <button onClick={handleUpdateAgent}>Update Agent</button>
         ) : (
@@ -160,7 +143,6 @@ const Agents: React.FC = () => {
         )}
       </div>
 
-      {/* List of Agents */}
       <ul>
         {agents.map((agent) => (
           <li key={agent.id}>
