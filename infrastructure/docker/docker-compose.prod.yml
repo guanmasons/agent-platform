@@ -1,21 +1,14 @@
+version: '3.8'
+
 services:
   datastore-api:
     build:
       context: ../../services/datastore-api
       dockerfile: Dockerfile
-    env_file:
-      - /opt/agent-platform/.env
+    env_file: 
+      - .env
     ports:
-      - "${DATASTORE_API_PORT:-3001}:${DATASTORE_API_PORT:-3001}"
-    environment:
-      SERVICE_PORT: ${DATASTORE_API_PORT:-3001}
-      SERVICE_REGION: ${AWS_REGION}
-      DYNAMODB_USER_TABLE: ${DYNAMODB_USER_TABLE}
-      DYNAMODB_AGENT_TABLE: ${DYNAMODB_AGENT_TABLE}
-      DYNAMODB_USER_LOGIN_TABLE: ${DYNAMODB_USER_LOGIN_TABLE}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
+      - "${DATASTORE_API_PORT}:${DATASTORE_API_PORT}"
     networks:
       - agent-platform-network
 
@@ -23,19 +16,10 @@ services:
     build:
       context: ../../services/control-api
       dockerfile: Dockerfile
-    env_file:
-      - /opt/agent-platform/.env
+    env_file: 
+      - .env
     ports:
-      - "${CONTROL_API_PORT:-3002}:${CONTROL_API_PORT:-3002}"
-    environment:
-      SERVICE_PORT: ${CONTROL_API_PORT:-3002}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
-      KEYCLOAK_ADMIN_USER: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KEYCLOAK_SERVER_URL: http://keycloak:8080
-      DATASTORE_API_URL: http://datastore-api:${DATASTORE_API_PORT:-3001}
+      - "${CONTROL_API_PORT}:${CONTROL_API_PORT}"
     depends_on:
       - datastore-api
       - keycloak
@@ -46,15 +30,10 @@ services:
     build:
       context: ../../services/web-service
       dockerfile: Dockerfile
-    env_file:
-      - /opt/agent-platform/.env
+    env_file: 
+      - .env
     ports:
-      - "${WEB_SERVICE_PORT:-3000}:${WEB_SERVICE_PORT:-3000}"
-    environment:
-      REACT_APP_CONTROL_API_URL: http://${EC2_PUBLIC_IP:-localhost}:${CONTROL_API_PORT:-3002}
-      REACT_APP_KEYCLOAK_URL: http://${EC2_PUBLIC_IP:-localhost}:8080
-      REACT_APP_KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      REACT_APP_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_WEB_CLIENT_ID}
+      - "${WEB_SERVICE_PORT}:${WEB_SERVICE_PORT}"
     depends_on:
       - control-api
     networks:
@@ -64,13 +43,10 @@ services:
     build:
       context: ../../services/keycloak
       dockerfile: Dockerfile
-    env_file:
-      - /opt/agent-platform/.env
+    env_file: 
+      - .env
     ports:
       - "8080:8080"
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     networks:
       - agent-platform-network
 

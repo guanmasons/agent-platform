@@ -66,4 +66,4 @@ docker-compose -f infrastructure/docker/docker-compose.prod.yml ps
 
 4. Debug ec2
 - `sudo cat /var/log/cloud-init-output.log`: Check init status
-- `sudo cat /var/log/user-data.log`: Check user data
+- Check user data: `sudo cat /var/lib/cloud/instances/i-xxxxxxx/user-data.txt.i`, or `sudo cat /var/log/user-data.log`

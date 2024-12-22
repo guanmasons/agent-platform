@@ -149,47 +149,74 @@ Resources:
           rm -rf /opt/agent-platform
           git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
 
-          # Get EC2 public IP
-          EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-
-          # Create and populate .env file
-          cat << EOF > /opt/agent-platform/.env
+          # Create environment variable setup script
+          cat << EOF > /opt/agent-platform/setup-env.sh
+          #!/bin/bash
           # AWS Configuration
-          AWS_REGION=${AWSRegion}
-          AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
-          AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
+          export AWS_REGION=${AWSRegion}
+          export AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
+          export AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
           
           # DynamoDB Tables
-          DYNAMODB_USER_TABLE=${StackName}-UserTable
-          DYNAMODB_AGENT_TABLE=${StackName}-AgentTable
-          DYNAMODB_USER_LOGIN_TABLE=${StackName}-LoginTable
+          export DYNAMODB_USER_TABLE=${StackName}-UserTable
+          export DYNAMODB_AGENT_TABLE=${StackName}-AgentTable
+          export DYNAMODB_USER_LOGIN_TABLE=${StackName}-LoginTable
           
           # Service Ports
-          DATASTORE_API_PORT=${DatastoreApiPort}
-          CONTROL_API_PORT=${ControlApiPort}
-          SEARCH_API_PORT=${SearchApiPort}
-          WEB_SERVICE_PORT=${WebServicePort}
+          export DATASTORE_API_PORT=${DatastoreApiPort}
+          export CONTROL_API_PORT=${ControlApiPort}
+          export SEARCH_API_PORT=${SearchApiPort}
+          export WEB_SERVICE_PORT=${WebServicePort}
           
           # Keycloak Configuration
-          KEYCLOAK_REALM=${KeycloakRealm}
-          KEYCLOAK_CLIENT_ID=${KeycloakClientId}
-          KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}
-          KEYCLOAK_ADMIN_USER=${KeycloakAdminUser}
-          KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
-          KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
+          export KEYCLOAK_REALM=${KeycloakRealm}
+          export KEYCLOAK_CLIENT_ID=${KeycloakClientId}
+          export KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}
+          export KEYCLOAK_ADMIN_USER=${KeycloakAdminUser}
+          export KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
+          export KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
           
-          # EC2 Public IP
-          EC2_PUBLIC_IP=$EC2_PUBLIC_IP
+          # Get EC2 public IP
+          export EC2_PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+          
+          # Service URLs
+          export KEYCLOAK_SERVER_URL="http://keycloak:8080"
+          export DATASTORE_API_URL="http://datastore-api:\${DATASTORE_API_PORT}"
+          export CONTROL_API_URL="http://\${EC2_PUBLIC_IP}:\${CONTROL_API_PORT}"
+          export KEYCLOAK_URL="http://\${EC2_PUBLIC_IP}:8080"
           EOF
 
+          chmod +x /opt/agent-platform/setup-env.sh
+
+          # Create the run-docker script
+          cat << 'EOF' > /opt/agent-platform/run-docker.sh
+          #!/bin/bash
+          set -e
+
+          # Source the environment variables
+          source /opt/agent-platform/setup-env.sh
+
+          # Export all variables to environment
+          export $(cat /opt/agent-platform/setup-env.sh | grep -v '^#' | grep '=' | cut -d= -f1)
+
+          # Run docker-compose
           cd /opt/agent-platform
-          source .env
+          docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+          EOF
+
+          chmod +x /opt/agent-platform/run-docker.sh
+
+          # Add environment setup to ec2-user's .bashrc
+          echo 'source /opt/agent-platform/setup-env.sh' >> /home/ec2-user/.bashrc
+          echo 'alias platform-docker="cd /opt/agent-platform && docker-compose -f infrastructure/docker/docker-compose.prod.yml"' >> /home/ec2-user/.bashrc
 
           # Set proper permissions
           chown -R ec2-user:ec2-user /opt/agent-platform
+          chmod 600 /opt/agent-platform/setup-env.sh
 
           # Start Docker services
-          docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
+          cd /opt/agent-platform
+          ./run-docker.sh
 
 Parameters:
   StackName:

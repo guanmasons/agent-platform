@@ -232,18 +232,57 @@ Resources:
 
             EOF
 
+
             # Set proper permissions
 
             chown -R ec2-user:ec2-user /opt/agent-platform
+
             chmod 600 /opt/agent-platform/.env
+
+
+            # Create run script
+
+            cat << ''EOF'' > /opt/agent-platform/run-docker.sh
+
+            #!/bin/bash
+
+            set -e
+
+
+            # Export all variables
+
+            set -a
+
+            source /opt/agent-platform/.env
+
+            set +a
+
+
+            # Get and update EC2 public IP
+
+            EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+            sed -i "s/^EC2_PUBLIC_IP=.*/EC2_PUBLIC_IP=$EC2_PUBLIC_IP/" /opt/agent-platform/.env
+
+
+            # Run docker-compose
+
+            cd /opt/agent-platform
+
+            docker-compose --env-file /opt/agent-platform/.env -f infrastructure/docker/docker-compose.prod.yml
+            up -d --build
+
+            EOF
+
+
+            chmod +x /opt/agent-platform/run-docker.sh
+
 
             # Start Docker services
 
             cd /opt/agent-platform
 
-            source /opt/agent-platform/.env
-
-            docker-compose -f infrastructure/docker/docker-compose.prod.yml --env-file /opt/agent-platform/.env up -d
+            ./run-docker.sh
 
             '
 Parameters:
