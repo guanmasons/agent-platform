@@ -1,13 +1,23 @@
 # Use the official Keycloak base image
-FROM quay.io/keycloak/keycloak:latest as builder
+FROM quay.io/keycloak/keycloak:latest
 
-# Set the working directory inside the container
-WORKDIR /opt/keycloak
+# Enable health and metrics support
+ENV KC_HEALTH_ENABLED=true
+ENV KC_METRICS_ENABLED=true
 
-# Copy the realm configuration file into the container
-COPY realm-config.json /opt/keycloak/data/import/realm-config.json
+# Configure database
+ENV KC_DB=dev-file
 
-# Perform any other necessary configuration or customization here
+# Configure the admin user
+ENV KEYCLOAK_ADMIN=admin
+ENV KEYCLOAK_ADMIN_PASSWORD=admin
 
-# Import the realm configuration on container startup
-CMD ["--import-realm"]
+# Import realm on startup
+ENV KC_FEATURES=scripts
+ENV KC_HTTP_RELATIVE_PATH=/auth
+
+# Copy realm configuration
+COPY realm-config.json /opt/keycloak/data/import/
+
+# Set up the entrypoint
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]

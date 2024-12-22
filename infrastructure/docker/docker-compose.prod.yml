@@ -3,6 +3,14 @@ services:
     build:
       context: ../../services/datastore-api
       dockerfile: Dockerfile
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - DATASTORE_API_PORT=${DATASTORE_API_PORT}
+      - DYNAMODB_USER_TABLE=${DYNAMODB_USER_TABLE}
+      - DYNAMODB_AGENT_TABLE=${DYNAMODB_AGENT_TABLE}
+      - DYNAMODB_USER_LOGIN_TABLE=${DYNAMODB_USER_LOGIN_TABLE}
     ports:
       - "${DATASTORE_API_PORT}:${DATASTORE_API_PORT}"
     networks:
@@ -12,6 +20,14 @@ services:
     build:
       context: ../../services/control-api
       dockerfile: Dockerfile
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - CONTROL_API_PORT=${CONTROL_API_PORT}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - DATASTORE_API_URL=http://datastore-api:${DATASTORE_API_PORT}
     ports:
       - "${CONTROL_API_PORT}:${CONTROL_API_PORT}"
     depends_on:
@@ -20,23 +36,29 @@ services:
     networks:
       - agent-platform-network
 
-  web-service:
-    build:
-      context: ../../services/web-service
-      dockerfile: Dockerfile
-    ports:
-      - "${WEB_SERVICE_PORT}:${WEB_SERVICE_PORT}"
-    depends_on:
-      - control-api
-    networks:
-      - agent-platform-network
-
   keycloak:
     build:
       context: ../../services/keycloak
       dockerfile: Dockerfile
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     ports:
       - "8080:8080"
+    networks:
+      - agent-platform-network
+
+  web-service:
+    build:
+      context: ../../services/web-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://localhost:3002
+    ports:
+      - "80:80"
+    depends_on:
+      - control-api
     networks:
       - agent-platform-network
 

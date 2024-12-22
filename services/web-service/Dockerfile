@@ -1,24 +1,33 @@
-# Stage 1: Build the React application
-FROM node:18 AS build
+# Build stage
+FROM node:18 as build
 
 WORKDIR /usr/src/app
 
+# Copy package files
 COPY package*.json ./
 
+# Install dependencies
 RUN npm install
 
+# Copy source code
 COPY . .
 
+# Set environment variables for build
+ENV REACT_APP_API_URL=http://localhost:3002
+ENV NODE_ENV=production
+
+# Build the app
 RUN npm run build
 
-# Stage 2: Serve the app with Nginx
+# Production stage
 FROM nginx:alpine
 
-# Copy the build output from the previous stage
+# Copy built assets from build stage
 COPY --from=build /usr/src/app/build /usr/share/nginx/html
 
-# Expose port 80
+# Copy nginx configuration if you have custom config
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
