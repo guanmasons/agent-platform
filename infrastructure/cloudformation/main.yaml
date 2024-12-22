@@ -182,12 +182,13 @@ Resources:
           EC2_PUBLIC_IP=$EC2_PUBLIC_IP
           EOF
 
+          cd /opt/agent-platform
+          source .env
+
           # Set proper permissions
           chown -R ec2-user:ec2-user /opt/agent-platform
 
           # Start Docker services
-          cd /opt/agent-platform
-          source .env
           docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
 
 Parameters:
