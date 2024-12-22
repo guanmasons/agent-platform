@@ -49,39 +49,40 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for Agent Platform
+      VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
+        # Public access ports
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+          Description: Allow HTTP from anywhere
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+          Description: Allow HTTPS from anywhere
         - IpProtocol: tcp
-          FromPort: 3000
-          ToPort: 3000
-          CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSSHIP
+          Description: Allow SSH from specific IP
+        # Internal service ports
         - IpProtocol: tcp
           FromPort: 3001
           ToPort: 3001
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/16
+          Description: Datastore API port
         - IpProtocol: tcp
           FromPort: 3002
           ToPort: 3002
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/16
+          Description: Control API port
         - IpProtocol: tcp
           FromPort: 3003
           ToPort: 3003
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/16
+          Description: Crawler/Developer API port
 
   EC2InstanceRole:
     Type: AWS::IAM::Role
@@ -219,6 +220,93 @@ Resources:
           cd /opt/agent-platform
           ./run-docker.sh
 
+  # VPC Configuration
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: AgentPlatformVPC
+
+  # Public Subnet for external access (web-service)
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: AgentPlatformPublicSubnet
+
+  # Private Subnet for internal services
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: AgentPlatformPrivateSubnet
+
+  # Internet Gateway for public subnet
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: AgentPlatformIGW
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Route table for public subnet
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: AgentPlatformPublicRT
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # Route table for private subnet
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: AgentPlatformPrivateRT
+
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
 Parameters:
   StackName:
     Type: String
@@ -297,8 +385,7 @@ Outputs:
     Value: !GetAtt EC2Instance.PublicIp
   EC2InstancePublicDNS:
     Description: Public DNS of the EC2 instance
-    Value: !GetAtt EC2Instance.PublicDnsName
-  UserTableName:
+    Value: !GetAtt EC2Instance.PublicDnsName  UserTableName:
     Description: Name of the User DynamoDB table
     Value: !Ref UserTable
   AgentTableName:
