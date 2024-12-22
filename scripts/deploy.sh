@@ -15,9 +15,9 @@ aws cloudformation package \
 echo "Deploying CloudFormation stack..."
 aws cloudformation deploy \
     --template-file infrastructure/cloudformation/packaged-main.yaml \
-    --stack-name agent-platform \
+    --stack-name ${STACK_NAME} \
     --parameter-overrides \
-        StackName=agent-platform \
+        StackName=${STACK_NAME} \
         EC2KeyPairName=${EC2_KEY_PAIR_NAME} \
         KeycloakClientSecret=${KEYCLOAK_CLIENT_SECRET} \
         KeycloakAdminPassword=${KEYCLOAK_ADMIN_PASSWORD} \
@@ -38,12 +38,12 @@ aws cloudformation deploy \
 # Get stack outputs
 echo "Getting stack outputs..."
 INSTANCE_IP=$(aws cloudformation describe-stacks \
-    --stack-name agent-platform \
+    --stack-name ${STACK_NAME} \
     --query 'Stacks[0].Outputs[?OutputKey==`EC2InstancePublicIP`].OutputValue' \
     --output text)
 
 INSTANCE_DNS=$(aws cloudformation describe-stacks \
-    --stack-name agent-platform \
+    --stack-name ${STACK_NAME} \
     --query 'Stacks[0].Outputs[?OutputKey==`EC2InstancePublicDNS`].OutputValue' \
     --output text)
 

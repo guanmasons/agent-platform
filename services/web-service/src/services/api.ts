@@ -32,7 +32,7 @@ export const createAgent = async (agent: Agent, token: string): Promise<Agent> =
 
 export const updateAgent = async (agent: Agent, token: string): Promise<Agent> => {
   try {
-    const response = await axios.put(`${CONTROL_API_BASE_URL}/agents/${agent.agentId}`, agent, {
+    const response = await axios.put(`${CONTROL_API_BASE_URL}/agents/${agent.id}`, agent, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -44,9 +44,9 @@ export const updateAgent = async (agent: Agent, token: string): Promise<Agent> =
   }
 };
 
-export const deleteAgent = async (agentId: string, token: string): Promise<void> => {
+export const deleteAgent = async (id: string, token: string): Promise<void> => {
   try {
-    await axios.delete(`${CONTROL_API_BASE_URL}/agents/${agentId}`, {
+    await axios.delete(`${CONTROL_API_BASE_URL}/agents/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

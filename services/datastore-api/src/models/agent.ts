@@ -5,84 +5,80 @@ import {
   UpdateItemCommand,
   DeleteItemCommand,
   QueryCommand,
+  AttributeValue
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { Agent } from "../types/agent";
 
 export class AgentModel {
-  private dynamodbClient: DynamoDBClient;
-  private tableName: string;
+  private readonly tableName: string;
+  private readonly dynamoDb: DynamoDBClient;
 
-  constructor(dynamodbClient: DynamoDBClient, tableName: string) {
-    this.dynamodbClient = dynamodbClient;
+  constructor(dynamoDb: DynamoDBClient, tableName: string) {
     this.tableName = tableName;
+    this.dynamoDb = dynamoDb;
   }
 
-  async getAgent(agentId: string): Promise<Agent | null> {
+  async getAgent(id: string): Promise<Agent | null> {
     const params = {
       TableName: this.tableName,
-      Key: marshall({ agentId: agentId }),
+      Key: marshall({ id }),
     };
 
-    const { Item } = await this.dynamodbClient.send(new GetItemCommand(params));
+    const { Item } = await this.dynamoDb.send(new GetItemCommand(params));
     return Item ? (unmarshall(Item) as Agent) : null;
   }
 
   async createAgent(agent: Agent): Promise<Agent> {
-    const agentItem = {
-        agentId: agent.agentId,
-        agentName: agent.agentName,
-        userId: agent.userId,
-        description: agent.description,
-        scope: agent.scope,
-        oosAction: agent.oosAction,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-        url: agent.url,
-        mstpAddr: agent.mstpAddr,
-      };
-
     const params = {
       TableName: this.tableName,
-      Item: marshall(agentItem),
+      Item: marshall(agent),
     };
 
-    await this.dynamodbClient.send(new PutItemCommand(params));
+    await this.dynamoDb.send(new PutItemCommand(params));
     return agent;
   }
 
   async updateAgent(agent: Agent): Promise<Agent> {
     const params = {
       TableName: this.tableName,
-      Key: marshall({ agentId: agent.agentId }),
+      Key: marshall({ id: agent.id }),
       UpdateExpression:
-        "set agentName = :agentName, userId = :userId, description = :description, scope = :scope, oosAction = :oosAction, updatedAt = :updatedAt, url = :url, mstpAddr = :mstpAddr",
+        "set #name = :name, userId = :userId, description = :description, #status = :status, scope = :scope, oosAction = :oosAction, updatedAt = :updatedAt, url = :url, mstpAddr = :mstpAddr",
+      ExpressionAttributeNames: {
+        "#name": "name",
+        "#status": "status"
+      },
       ExpressionAttributeValues: marshall({
-        ":agentName": agent.agentName,
+        ":name": agent.name,
         ":userId": agent.userId,
         ":description": agent.description,
+        ":status": agent.status,
         ":scope": agent.scope,
         ":oosAction": agent.oosAction,
         ":updatedAt": agent.updatedAt,
         ":url": agent.url,
         ":mstpAddr": agent.mstpAddr,
       }),
-      ReturnValues: "ALL_NEW",
+      ReturnValues: "ALL_NEW" as const,
     };
 
-    const { Attributes } = await this.dynamodbClient.send(
-      new UpdateItemCommand(params)
-    );
-    return Attributes ? (unmarshall(Attributes) as Agent) : null;
+    const { Attributes } = await this.dynamoDb.send(new UpdateItemCommand(params));
+    
+    if (!Attributes) {
+      throw new Error(`Agent with id ${agent.id} not found`);
+    }
+    
+    return unmarshall(Attributes) as Agent;
   }
 
-  async deleteAgent(agentId: string): Promise<void> {
+  async deleteAgent(id: string): Promise<void> {
     const params = {
       TableName: this.tableName,
-      Key: marshall({ agentId: agentId }),
+      Key: marshall({ id }),
     };
 
-    await this.dynamodbClient.send(new DeleteItemCommand(params));
+    await this.dynamoDb.send(new DeleteItemCommand(params));
   }
 
   async getAgentsByUserId(userId: string): Promise<Agent[]> {
@@ -94,8 +90,8 @@ export class AgentModel {
         ":userId": userId,
       }),
     };
-  
-    const { Items } = await this.dynamodbClient.send(new QueryCommand(params));
-    return Items ? (Items.map((item) => unmarshall(item) as Agent)) : [];
+
+    const { Items } = await this.dynamoDb.send(new QueryCommand(params));
+    return Items ? Items.map(item => unmarshall(item) as Agent) : [];
   }
 }

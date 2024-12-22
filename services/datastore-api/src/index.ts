@@ -73,10 +73,10 @@ app.delete("/users/:userId", async (req: Request, res: Response) => {
 });
 
 // Agent API Routes
-app.get("/agents/:agentId", async (req: Request, res: Response) => {
-  const agentId = req.params.agentId;
+app.get("/agents/:id", async (req: Request, res: Response) => {
+  const id = req.params.id;
   try {
-    const agent = await agentModel.getAgent(agentId);
+    const agent = await agentModel.getAgent(id);
     if (agent) {
       res.json(agent);
     } else {
@@ -89,8 +89,22 @@ app.get("/agents/:agentId", async (req: Request, res: Response) => {
 });
 
 app.post("/agents", async (req: Request, res: Response) => {
-  const agent: Agent = req.body;
   try {
+    const agentData: Partial<Agent> = req.body;
+    const agent: Agent = {
+      id: agentData.id || crypto.randomUUID(),
+      name: agentData.name || '',
+      userId: agentData.userId || '',
+      description: agentData.description || '',
+      status: agentData.status || 'inactive',
+      scope: agentData.scope || '',
+      oosAction: agentData.oosAction || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      url: agentData.url || '',
+      mstpAddr: agentData.mstpAddr || ''
+    };
+    
     const createdAgent = await agentModel.createAgent(agent);
     res.status(201).json(createdAgent);
   } catch (error) {
@@ -99,24 +113,34 @@ app.post("/agents", async (req: Request, res: Response) => {
   }
 });
 
-app.put("/agents/:agentId", async (req: Request, res: Response) => {
-  const agentId = req.params.agentId;
-  const agent: Agent = req.body;
-  agent.agentId = agentId;
-
+app.put("/agents/:id", async (req: Request, res: Response) => {
+  const id = req.params.id;
   try {
-    const updatedAgent = await agentModel.updateAgent(agent);
-    res.json(updatedAgent);
+    const existingAgent = await agentModel.getAgent(id);
+    if (!existingAgent) {
+      return res.status(404).send("Agent not found");
+    }
+
+    const agentData: Partial<Agent> = req.body;
+    const updatedAgent: Agent = {
+      ...existingAgent,
+      ...agentData,
+      id,
+      updatedAt: new Date().toISOString()
+    };
+
+    const result = await agentModel.updateAgent(updatedAgent);
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).send("Internal Server Error");
   }
 });
 
-app.delete("/agents/:agentId", async (req: Request, res: Response) => {
-  const agentId = req.params.agentId;
+app.delete("/agents/:id", async (req: Request, res: Response) => {
+  const id = req.params.id;
   try {
-    await agentModel.deleteAgent(agentId);
+    await agentModel.deleteAgent(id);
     res.status(204).send();
   } catch (error) {
     console.error(error);

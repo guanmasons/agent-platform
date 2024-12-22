@@ -1,12 +1,13 @@
 export interface Agent {
-    agentId: string;
-    agentName: string;
-    userId: string; // to query agents under an user
+    id: string;
+    name: string;
+    userId: string;
     description: string;
+    status: 'active' | 'inactive';
     scope: string;
     oosAction: string;
-    createdAt: number;
-    updatedAt: number;
+    createdAt: string;
+    updatedAt: string;
     url: string;
     mstpAddr: string;
-  }
+}

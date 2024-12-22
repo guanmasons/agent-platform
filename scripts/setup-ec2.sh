@@ -12,19 +12,17 @@ unzip awscliv2.zip
 ./aws/install
 
 # Create directory for deployment and .env file
-mkdir -p /opt/ai-agent-platform
-touch /opt/ai-agent-platform/.env
+mkdir -p /opt/${STACK_NAME}
+touch /opt/${STACK_NAME}/.env
 
-# Set environment variables from CloudFormation parameters (passed via UserData)
-# Note: This assumes you are passing these parameters to the EC2 instance via CloudFormation
-# You might need a different mechanism depending on how you manage secrets
-echo "KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}" >> /opt/ai-agent-platform/.env
-echo "KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}" >> /opt/ai-agent-platform/.env
+# Set environment variables from CloudFormation parameters
+echo "KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}" >> /opt/${STACK_NAME}/.env
+echo "KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}" >> /opt/${STACK_NAME}/.env
 
 # Clone the GitHub repository
-git clone https://github.com/your-github-username/ai-agent-platform.git /opt/ai-agent-platform
-chown -R ec2-user:ec2-user /opt/ai-agent-platform
+git clone https://github.com/${GITHUB_USERNAME}/${GITHUB_REPO}.git /opt/${STACK_NAME}
+chown -R ec2-user:ec2-user /opt/${STACK_NAME}
 
 # Build and start services using Docker Compose
-cd /opt/ai-agent-platform
+cd /opt/${STACK_NAME}
 docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build

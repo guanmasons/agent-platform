@@ -6,14 +6,15 @@ import { Agent } from '../types/agent';
 const Agents: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [newAgent, setNewAgent] = useState<Agent>({
-    agentId: '',
-    agentName: '',
+    id: '',
+    name: '',
     userId: '',
     description: '',
+    status: 'inactive',
     scope: '',
     oosAction: '',
-    createdAt: 0,
-    updatedAt: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     url: '',
     mstpAddr: '',
   });
@@ -50,14 +51,15 @@ const Agents: React.FC = () => {
       const createdAgent = await createAgent(newAgent, keycloak.token!);
       setAgents([...agents, createdAgent]);
       setNewAgent({
-        agentId: '',
-        agentName: '',
+        id: '',
+        name: '',
         userId: '',
         description: '',
+        status: 'inactive',
         scope: '',
         oosAction: '',
-        createdAt: 0,
-        updatedAt: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         url: '',
         mstpAddr: '',
       });
@@ -74,7 +76,7 @@ const Agents: React.FC = () => {
     if (!editingAgent) return;
     try {
       const updatedAgent = await updateAgent(editingAgent, keycloak.token!);
-      setAgents(agents.map((a) => (a.agentId === updatedAgent.agentId ? updatedAgent : a)));
+      setAgents(agents.map((a) => (a.id === updatedAgent.id ? updatedAgent : a)));
       setEditingAgent(null);
     } catch (error) {
       console.error('Failed to update agent:', error);
@@ -84,7 +86,7 @@ const Agents: React.FC = () => {
   const handleDeleteAgent = async (agentId: string) => {
     try {
       await deleteAgent(agentId, keycloak.token!);
-      setAgents(agents.filter((a) => a.agentId !== agentId));
+      setAgents(agents.filter((a) => a.id !== agentId));
     } catch (error) {
       console.error('Failed to delete agent:', error);
     }
@@ -99,9 +101,9 @@ const Agents: React.FC = () => {
         <h2>{editingAgent ? 'Edit Agent' : 'Create New Agent'}</h2>
         <input
           type="text"
-          name="agentName"
+          name="name"
           placeholder="Agent Name"
-          value={editingAgent ? editingAgent.agentName : newAgent.agentName}
+          value={editingAgent ? editingAgent.name : newAgent.name}
           onChange={handleInputChange}
         />
         <input
@@ -139,6 +141,14 @@ const Agents: React.FC = () => {
           value={editingAgent ? editingAgent.mstpAddr : newAgent.mstpAddr}
           onChange={handleInputChange}
         />
+        <select
+          name="status"
+          value={editingAgent ? editingAgent.status : newAgent.status}
+          onChange={handleInputChange}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
         {/* Add more input fields for other properties as needed */}
         {editingAgent ? (
           <button onClick={handleUpdateAgent}>Update Agent</button>
@@ -153,10 +163,10 @@ const Agents: React.FC = () => {
       {/* List of Agents */}
       <ul>
         {agents.map((agent) => (
-          <li key={agent.agentId}>
-            {agent.agentName} - {agent.description}
+          <li key={agent.id}>
+            {agent.name} - {agent.description}
             <button onClick={() => handleEditAgent(agent)}>Edit</button>
-            <button onClick={() => handleDeleteAgent(agent.agentId)}>Delete</button>
+            <button onClick={() => handleDeleteAgent(agent.id)}>Delete</button>
           </li>
         ))}
       </ul>
