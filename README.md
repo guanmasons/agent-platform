@@ -53,7 +53,7 @@ On your local, run:
 - On the ec2 instance,
 ```
 cd /opt/agent-platform &&
-docker-compose -f infrastructure/docker/docker-compose.prod.yml ps`
+docker-compose -f infrastructure/docker/docker-compose.prod.yml ps
 ```
   - Check docker container logs for errors: `docker-compose -f infrastructure/docker/docker-compose.prod.yml logs --tail=100 -f`
   - Test Keycloak

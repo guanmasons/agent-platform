@@ -1,280 +1,79 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: Agent Platform Infrastructure
+services:
+  datastore-api:
+    build:
+      context: ../../services/datastore-api
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${DATASTORE_API_PORT:-3001}:${DATASTORE_API_PORT:-3001}"
+    environment:
+      SERVICE_PORT: ${DATASTORE_API_PORT:-3001}
+      SERVICE_REGION: ${AWS_REGION}
+      DYNAMODB_USER_TABLE: ${DYNAMODB_USER_TABLE}
+      DYNAMODB_AGENT_TABLE: ${DYNAMODB_AGENT_TABLE}
+      DYNAMODB_USER_LOGIN_TABLE: ${DYNAMODB_USER_LOGIN_TABLE}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+    networks:
+      - agent-platform-network
 
-Resources:
-  # DynamoDB Tables
-  UserTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub '${StackName}-UserTable'
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
+  control-api:
+    build:
+      context: ../../services/control-api
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${CONTROL_API_PORT:-3002}:${CONTROL_API_PORT:-3002}"
+    environment:
+      SERVICE_PORT: ${CONTROL_API_PORT:-3002}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_ADMIN_USER: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_SERVER_URL: http://keycloak:8080
+      DATASTORE_API_URL: http://datastore-api:${DATASTORE_API_PORT:-3001}
+    depends_on:
+      - datastore-api
+      - keycloak
+    networks:
+      - agent-platform-network
 
-  AgentTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub '${StackName}-AgentTable'
-      AttributeDefinitions:
-        - AttributeName: agentId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: agentId
-          KeyType: HASH
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
+  web-service:
+    build:
+      context: ../../services/web-service
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${WEB_SERVICE_PORT:-3000}:${WEB_SERVICE_PORT:-3000}"
+    environment:
+      REACT_APP_CONTROL_API_URL: http://${EC2_PUBLIC_IP:-localhost}:${CONTROL_API_PORT:-3002}
+      REACT_APP_KEYCLOAK_URL: http://${EC2_PUBLIC_IP:-localhost}:8080
+      REACT_APP_KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      REACT_APP_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_WEB_CLIENT_ID}
+    depends_on:
+      - control-api
+    networks:
+      - agent-platform-network
 
-  LoginTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub '${StackName}-LoginTable'
-      AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
+  keycloak:
+    build:
+      context: ../../services/keycloak
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    networks:
+      - agent-platform-network
 
-  EC2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for Agent Platform
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3000
-          ToPort: 3000
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3001
-          ToPort: 3001
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3002
-          ToPort: 3002
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3003
-          ToPort: 3003
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
-
-  EC2InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: DynamoDBAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:*
-                Resource:
-                  - !GetAtt UserTable.Arn
-                  - !GetAtt AgentTable.Arn
-                  - !GetAtt LoginTable.Arn
-
-  EC2InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Path: /
-      Roles:
-        - !Ref EC2InstanceRole
-
-  EC2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: ami-0aa117785d1c1bfe5
-      InstanceType: !Ref EC2InstanceType
-      KeyName: !Ref EC2KeyPairName
-      SecurityGroupIds:
-        - !Ref EC2SecurityGroup
-      IamInstanceProfile: !Ref EC2InstanceProfile
-      UserData: 
-        Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          
-          # Install required packages
-          yum update -y
-          yum install -y docker git unzip
-
-          # Start and enable Docker
-          systemctl start docker
-          systemctl enable docker
-          usermod -a -G docker ec2-user
-
-          # Install AWS CLI v2
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          ./aws/install
-          rm awscliv2.zip
-
-          # Install Docker Compose
-          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
-
-          # Clean up and clone repository
-          rm -rf /opt/agent-platform
-          git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
-
-          # Get EC2 public IP
-          EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-
-          # Create and populate .env file
-          cat << EOF > /opt/agent-platform/.env
-          # AWS Configuration
-          AWS_REGION=${AWSRegion}
-          AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
-          AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
-          
-          # DynamoDB Tables
-          DYNAMODB_USER_TABLE=${StackName}-UserTable
-          DYNAMODB_AGENT_TABLE=${StackName}-AgentTable
-          DYNAMODB_USER_LOGIN_TABLE=${StackName}-LoginTable
-          
-          # Service Ports
-          DATASTORE_API_PORT=${DatastoreApiPort}
-          CONTROL_API_PORT=${ControlApiPort}
-          SEARCH_API_PORT=${SearchApiPort}
-          WEB_SERVICE_PORT=${WebServicePort}
-          
-          # Keycloak Configuration
-          KEYCLOAK_REALM=${KeycloakRealm}
-          KEYCLOAK_CLIENT_ID=${KeycloakClientId}
-          KEYCLOAK_CLIENT_SECRET=${KeycloakClientSecret}
-          KEYCLOAK_ADMIN_USER=${KeycloakAdminUser}
-          KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
-          KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
-          
-          # EC2 Public IP
-          EC2_PUBLIC_IP=$EC2_PUBLIC_IP
-          EOF
-
-          # Set proper permissions
-          chown -R ec2-user:ec2-user /opt/agent-platform
-
-          # Start Docker services
-          cd /opt/agent-platform
-          source .env
-          docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
-
-Parameters:
-  StackName:
-    Type: String
-    Description: Name of the CloudFormation stack
-  AWSRegion:
-    Type: String
-    Default: us-west-1
-    Description: AWS Region for resources
-  EC2InstanceType:
-    Type: String
-    Default: t2.micro
-    Description: EC2 instance type
-  EC2KeyPairName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Name of an existing EC2 KeyPair
-  KeycloakRealm:
-    Type: String
-    Default: agent-platform-realm
-    Description: Keycloak realm name
-  KeycloakClientId:
-    Type: String
-    Default: agent-platform-client
-    Description: Keycloak client ID
-  KeycloakClientSecret:
-    Type: String
-    NoEcho: true
-    Description: Keycloak client secret
-  KeycloakAdminUser:
-    Type: String
-    Default: admin
-    Description: Keycloak admin username
-  KeycloakAdminPassword:
-    Type: String
-    NoEcho: true
-    Description: Keycloak admin password
-  KeycloakWebClientId:
-    Type: String
-    Default: agent-platform-web-client
-    Description: Keycloak web client ID
-  DatastoreApiPort:
-    Type: String
-    Default: "3001"
-    Description: Port for Datastore API
-  ControlApiPort:
-    Type: String
-    Default: "3002"
-    Description: Port for Control API
-  SearchApiPort:
-    Type: String
-    Default: "3003"
-    Description: Port for Search API
-  WebServicePort:
-    Type: String
-    Default: "3000"
-    Description: Port for Web Service
-  GitHubUsername:
-    Type: String
-    Default: guanmasons
-    Description: GitHub username
-  GitHubRepo:
-    Type: String
-    Default: agent-platform
-    Description: GitHub repository name
-  AwsAccessKeyId:
-    Type: String
-    NoEcho: true
-    Description: AWS Access Key ID
-  AwsSecretAccessKey:
-    Type: String
-    NoEcho: true
-    Description: AWS Secret Access Key
-
-Outputs:
-  EC2InstancePublicIP:
-    Description: Public IP of the EC2 instance
-    Value: !GetAtt EC2Instance.PublicIp
-  EC2InstancePublicDNS:
-    Description: Public DNS of the EC2 instance
-    Value: !GetAtt EC2Instance.PublicDnsName
-  UserTableName:
-    Description: Name of the User DynamoDB table
-    Value: !Ref UserTable
-  AgentTableName:
-    Description: Name of the Agent DynamoDB table
-    Value: !Ref AgentTable
-  LoginTableName:
-    Description: Name of the Login DynamoDB table
-    Value: !Ref LoginTable
+networks:
+  agent-platform-network:
+    driver: bridge
