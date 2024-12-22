@@ -50,3 +50,20 @@ On your local, run:
 ```
 3. Verify service is up and running
 - On your local terminal, run `ssh -i /path/to/agent-platform-key-pair.pem ec2-user@<your-ec2-public-ip>`
+- On the ec2 instance,
+```
+cd /opt/agent-platform &&
+docker-compose -f infrastructure/docker/docker-compose.prod.yml ps`
+```
+  - Check docker container logs for errors: `docker-compose -f infrastructure/docker/docker-compose.prod.yml logs --tail=100 -f`
+  - Test Keycloak
+`curl http://localhost:8080/health`
+
+  - Test Datastore API: `curl http://localhost:3001/health`
+  - Test Control API: `curl http://localhost:3002/health`
+
+  - Test Web Service: `curl http://localhost:3000`
+
+4. Debug ec2
+- `sudo cat /var/log/cloud-init-output.log`: Check init status
+- `sudo cat /var/log/user-data.log`: Check user data

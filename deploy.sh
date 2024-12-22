@@ -4,13 +4,24 @@ set -e
 # Load environment variables
 source .env
 
+# Set stack name
+STACK_NAME="agent-platform"
+
+# Package the CloudFormation template
+aws cloudformation package \
+    --template-file infrastructure/cloudformation/main.yaml \
+    --s3-bucket "$S3_BUCKET_NAME" \
+    --output-template-file infrastructure/cloudformation/packaged-main.yaml
+
 echo "Starting deployment process..."
 
 # Deploy/Update the stack
 aws cloudformation deploy \
     --template-file infrastructure/cloudformation/main.yaml \
-    --stack-name agent-platform \
+    --stack-name $STACK_NAME \
     --parameter-overrides \
+        StackName=$STACK_NAME \
+        AWSRegion=$AWS_REGION \
         EC2InstanceType=$EC2_INSTANCE_TYPE \
         EC2KeyPairName=$EC2_KEY_PAIR_NAME \
         KeycloakRealm=$KEYCLOAK_REALM \
@@ -33,7 +44,7 @@ aws cloudformation deploy \
 # Get stack outputs
 echo "Retrieving stack outputs..."
 aws cloudformation describe-stacks \
-    --stack-name agent-platform \
+    --stack-name $STACK_NAME \
     --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
     --output table \
     --region $AWS_REGION

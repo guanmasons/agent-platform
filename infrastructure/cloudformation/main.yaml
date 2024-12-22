@@ -6,7 +6,7 @@ Resources:
   UserTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${AWS::StackName}-UserTable'
+      TableName: !Sub '${StackName}-UserTable'
       AttributeDefinitions:
         - AttributeName: userId
           AttributeType: S
@@ -20,7 +20,7 @@ Resources:
   AgentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${AWS::StackName}-AgentTable'
+      TableName: !Sub '${StackName}-AgentTable'
       AttributeDefinitions:
         - AttributeName: agentId
           AttributeType: S
@@ -34,7 +34,7 @@ Resources:
   LoginTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${AWS::StackName}-LoginTable'
+      TableName: !Sub '${StackName}-LoginTable'
       AttributeDefinitions:
         - AttributeName: userId
           AttributeType: S
@@ -45,7 +45,6 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
 
-  # EC2 Instance and Related Resources
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -123,7 +122,7 @@ Resources:
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
       IamInstanceProfile: !Ref EC2InstanceProfile
-      UserData:
+      UserData: 
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           
@@ -150,24 +149,20 @@ Resources:
           rm -rf /opt/agent-platform
           git clone https://github.com/${GitHubUsername}/${GitHubRepo}.git /opt/agent-platform
 
-          # Verify successful clone
-          if [ ! -d "/opt/agent-platform/.git" ]; then
-            echo "Git repository not properly cloned. Exiting."
-            exit 1
-          fi
-
-          cd /opt/agent-platform
+          # Get EC2 public IP
+          EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
           # Create and populate .env file
           cat << EOF > /opt/agent-platform/.env
-          AWS_REGION=${AWS::Region}
+          # AWS Configuration
+          AWS_REGION=${AWSRegion}
           AWS_ACCESS_KEY_ID=${AwsAccessKeyId}
           AWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}
           
           # DynamoDB Tables
-          DYNAMODB_USER_TABLE=${UserTable}
-          DYNAMODB_AGENT_TABLE=${AgentTable}
-          DYNAMODB_USER_LOGIN_TABLE=${LoginTable}
+          DYNAMODB_USER_TABLE=${StackName}-UserTable
+          DYNAMODB_AGENT_TABLE=${StackName}-AgentTable
+          DYNAMODB_USER_LOGIN_TABLE=${StackName}-LoginTable
           
           # Service Ports
           DATASTORE_API_PORT=${DatastoreApiPort}
@@ -183,11 +178,8 @@ Resources:
           KEYCLOAK_ADMIN_PASSWORD=${KeycloakAdminPassword}
           KEYCLOAK_WEB_CLIENT_ID=${KeycloakWebClientId}
           
-          # Get the instance's public IP
-          EC2_PUBLIC_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
-          
-          # Docker Compose Project Name
-          COMPOSE_PROJECT_NAME=agent-platform
+          # EC2 Public IP
+          EC2_PUBLIC_IP=$EC2_PUBLIC_IP
           EOF
 
           # Set proper permissions
@@ -197,58 +189,77 @@ Resources:
           cd /opt/agent-platform
           docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
 
-          # Add log to track execution
-          echo "UserData script completed at $(date)" >> /var/log/user-data.log
-
 Parameters:
+  StackName:
+    Type: String
+    Description: Name of the CloudFormation stack
+  AWSRegion:
+    Type: String
+    Default: us-west-1
+    Description: AWS Region for resources
   EC2InstanceType:
     Type: String
     Default: t2.micro
+    Description: EC2 instance type
   EC2KeyPairName:
-    Type: String
-    Default: agent-platform-key-pair
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair
   KeycloakRealm:
     Type: String
     Default: agent-platform-realm
+    Description: Keycloak realm name
   KeycloakClientId:
     Type: String
     Default: agent-platform-client
+    Description: Keycloak client ID
   KeycloakClientSecret:
     Type: String
     NoEcho: true
+    Description: Keycloak client secret
   KeycloakAdminUser:
     Type: String
     Default: admin
+    Description: Keycloak admin username
   KeycloakAdminPassword:
     Type: String
     NoEcho: true
+    Description: Keycloak admin password
   KeycloakWebClientId:
     Type: String
     Default: agent-platform-web-client
+    Description: Keycloak web client ID
   DatastoreApiPort:
     Type: String
     Default: "3001"
+    Description: Port for Datastore API
   ControlApiPort:
     Type: String
     Default: "3002"
+    Description: Port for Control API
   SearchApiPort:
     Type: String
     Default: "3003"
+    Description: Port for Search API
   WebServicePort:
     Type: String
     Default: "3000"
+    Description: Port for Web Service
   GitHubUsername:
     Type: String
     Default: guanmasons
+    Description: GitHub username
   GitHubRepo:
     Type: String
     Default: agent-platform
+    Description: GitHub repository name
   AwsAccessKeyId:
     Type: String
     NoEcho: true
+    Description: AWS Access Key ID
   AwsSecretAccessKey:
     Type: String
     NoEcho: true
+    Description: AWS Secret Access Key
 
 Outputs:
   EC2InstancePublicIP:
