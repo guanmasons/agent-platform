@@ -122,6 +122,8 @@ Resources:
         Ref: EC2InstanceType
       KeyName:
         Ref: EC2KeyPairName
+      SubnetId:
+        Ref: PublicSubnet
       SecurityGroupIds:
       - Ref: EC2SecurityGroup
       IamInstanceProfile:
@@ -320,7 +322,8 @@ Resources:
       AvailabilityZone:
         Fn::Select:
         - 0
-        - Fn::GetAZs: ''
+        - Fn::GetAZs:
+            Ref: AWS::Region
       Tags:
       - Key: Name
         Value: AgentPlatformPublicSubnet
@@ -334,7 +337,8 @@ Resources:
       AvailabilityZone:
         Fn::Select:
         - 0
-        - Fn::GetAZs: ''
+        - Fn::GetAZs:
+            Ref: AWS::Region
       Tags:
       - Key: Name
         Value: AgentPlatformPrivateSubnet
