@@ -17,7 +17,7 @@ echo "Starting deployment process..."
 
 # Deploy/Update the stack
 aws cloudformation deploy \
-    --template-file infrastructure/cloudformation/main.yaml \
+    --template-file infrastructure/cloudformation/packaged-main.yaml \
     --stack-name $STACK_NAME \
     --parameter-overrides \
         StackName=$STACK_NAME \
