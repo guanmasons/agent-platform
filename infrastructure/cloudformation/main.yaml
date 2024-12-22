@@ -186,6 +186,7 @@ Resources:
           chown -R ec2-user:ec2-user /opt/agent-platform
 
           # Start Docker services
+          source .env
           cd /opt/agent-platform
           docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d --build
 
