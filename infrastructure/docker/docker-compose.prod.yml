@@ -1,12 +1,8 @@
-version: '3.8'
-
 services:
   datastore-api:
     build:
       context: ../../services/datastore-api
       dockerfile: Dockerfile
-    env_file: 
-      - .env
     ports:
       - "${DATASTORE_API_PORT}:${DATASTORE_API_PORT}"
     networks:
@@ -16,8 +12,6 @@ services:
     build:
       context: ../../services/control-api
       dockerfile: Dockerfile
-    env_file: 
-      - .env
     ports:
       - "${CONTROL_API_PORT}:${CONTROL_API_PORT}"
     depends_on:
@@ -30,8 +24,6 @@ services:
     build:
       context: ../../services/web-service
       dockerfile: Dockerfile
-    env_file: 
-      - .env
     ports:
       - "${WEB_SERVICE_PORT}:${WEB_SERVICE_PORT}"
     depends_on:
@@ -43,8 +35,6 @@ services:
     build:
       context: ../../services/keycloak
       dockerfile: Dockerfile
-    env_file: 
-      - .env
     ports:
       - "8080:8080"
     networks:

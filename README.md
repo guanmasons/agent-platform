@@ -67,3 +67,12 @@ docker-compose -f infrastructure/docker/docker-compose.prod.yml ps
 4. Debug ec2
 - `sudo cat /var/log/cloud-init-output.log`: Check init status
 - Check user data: `sudo cat /var/lib/cloud/instances/i-xxxxxxx/user-data.txt.i`, or `sudo cat /var/log/user-data.log`
+## Container CI/CD
+### Create ECR
+```
+ for service in datastore-api control-api web-service keycloak; do
+    aws ecr create-repository \
+        --repository-name agent-platform-${service} \
+        --image-scanning-configuration scanOnPush=true
+done
+```
