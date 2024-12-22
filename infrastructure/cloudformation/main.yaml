@@ -65,8 +65,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: !Ref AllowedSSHIP
-          Description: Allow SSH from specific IP
+          CidrIp: 0.0.0.0/0
+          Description: Allow SSH from anywhere
         # Internal service ports
         - IpProtocol: tcp
           FromPort: 3001
@@ -385,7 +385,8 @@ Outputs:
     Value: !GetAtt EC2Instance.PublicIp
   EC2InstancePublicDNS:
     Description: Public DNS of the EC2 instance
-    Value: !GetAtt EC2Instance.PublicDnsName  UserTableName:
+    Value: !GetAtt EC2Instance.PublicDnsName
+  UserTableName:
     Description: Name of the User DynamoDB table
     Value: !Ref UserTable
   AgentTableName:
