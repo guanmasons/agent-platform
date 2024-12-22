@@ -4,6 +4,7 @@ import {
   PutItemCommand,
   UpdateItemCommand,
   DeleteItemCommand,
+  ReturnValue,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { User } from "../types/user";
@@ -64,13 +65,18 @@ export class UserModel {
         ":companyName": user.companyName,
         ":updatedAt": user.updatedAt,
       }),
-      ReturnValues: "ALL_NEW",
+      ReturnValues: "ALL_NEW" as ReturnValue
     };
 
     const { Attributes } = await this.dynamodbClient.send(
       new UpdateItemCommand(params)
     );
-    return Attributes ? (unmarshall(Attributes) as User) : null;
+    
+    if (!Attributes) {
+      throw new Error("Failed to update user");
+    }
+    
+    return unmarshall(Attributes) as User;
   }
 
   async deleteUser(userId: string): Promise<void> {
