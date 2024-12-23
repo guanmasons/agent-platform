@@ -1,22 +1,22 @@
+version: '3.8'
+
 services:
   datastore-api:
     build:
       context: ../../services/datastore-api
       dockerfile: Dockerfile
     environment:
-      - AWS_REGION=${AWS_REGION}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=local
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
       - DATASTORE_API_PORT=3001
-      - DYNAMODB_USER_TABLE=${DYNAMODB_USER_TABLE}
-      - DYNAMODB_AGENT_TABLE=${DYNAMODB_AGENT_TABLE}
-      - DYNAMODB_USER_LOGIN_TABLE=${DYNAMODB_USER_LOGIN_TABLE}
-    expose:
-      - "3001"
+      - DYNAMODB_USER_TABLE=local-users
+      - DYNAMODB_AGENT_TABLE=local-agents
+      - DYNAMODB_USER_LOGIN_TABLE=local-logins
+    ports:
+      - "3001:3001"
     networks:
-      internal:
-        aliases:
-          - datastore-api
+      - internal
 
   control-api:
     build:
@@ -25,39 +25,35 @@ services:
     environment:
       - CONTROL_API_PORT=3002
       - DATASTORE_API_URL=http://datastore-api:3001
-    expose:
-      - "3002"
+    ports:
+      - "3002:3002"
     depends_on:
       - datastore-api
     networks:
-      internal:
-        aliases:
-          - control-api
+      - internal
 
   keycloak:
     build:
       context: ../../services/keycloak
       dockerfile: Dockerfile
     environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
       - KC_DB=dev-file
       - KC_HEALTH_ENABLED=true
       - KC_METRICS_ENABLED=true
       - KC_HTTP_ENABLED=true
-      - KC_HOSTNAME=${EC2_PUBLIC_IP}
+      - KC_HOSTNAME=localhost
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_HOSTNAME_STRICT=false
       - KC_HOSTNAME_STRICT_HTTPS=false
       - KC_IMPORT=/opt/keycloak/data/import/realm-config.json
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     volumes:
       - ../../services/keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
     networks:
-      internal:
-        aliases:
-          - keycloak
+      - internal
     entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev"]
 
   web-service:
@@ -72,12 +68,7 @@ services:
       - control-api
     networks:
       - internal
-      - external
-    environment:
-      - NODE_ENV=production
 
 networks:
   internal:
-    internal: true
-  external:
-    internal: false
+    driver: bridge
